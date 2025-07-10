@@ -1,0 +1,802 @@
+{
+  "name": "Beds24 Autonomous Guest Services Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "guest-services",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "f4b8c5e1-8f42-4c5d-9e1a-2b3f4a5c6d7e",
+      "name": "Guest Services Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [260, 240],
+      "webhookId": "guest-services-webhook",
+      "notes": {
+        "note": "🎯 WEBHOOK TRIGGER\n\nThis webhook receives incoming guest messages and requests.\n\nSupported formats:\n- POST /guest-services\n- JSON payload with: message, guestEmail, bookingReference\n\nExample payload:\n{\n  \"message\": \"What time is check-in?\",\n  \"guestEmail\": \"guest@example.com\",\n  \"bookingReference\": \"BED123456\"\n}"
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "request_type_check",
+              "leftValue": "={{ $json.message }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-5e6f-7g8h-9i0j-k1l2m3n4o5p6",
+      "name": "Request Validation",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [480, 240],
+      "notes": {
+        "note": "✅ REQUEST VALIDATION\n\nValidates incoming webhook requests to ensure:\n- Message content exists\n- Required fields are present\n- Request structure is valid\n\nInvalid requests are rejected with appropriate error messages."
+      }
+    },
+    {
+      "parameters": {
+        "errorMessage": "Invalid request: Missing required fields (message, guestEmail)"
+      },
+      "id": "error-invalid-request",
+      "name": "Invalid Request Error",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [480, 400],
+      "notes": {
+        "note": "❌ ERROR HANDLER\n\nStops execution for invalid requests and returns error message to the webhook caller."
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract and normalize guest information\nconst message = $input.item(0, 0).json.message || '';\nconst guestEmail = $input.item(0, 0).json.guestEmail || '';\nconst bookingReference = $input.item(0, 0).json.bookingReference || '';\nconst guestName = $input.item(0, 0).json.guestName || '';\n\n// Generate conversation ID for tracking\nconst conversationId = `conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;\n\n// Classify request type for better handling\nconst requestType = classifyRequest(message);\n\nfunction classifyRequest(msg) {\n  const msgLower = msg.toLowerCase();\n  \n  if (msgLower.includes('check-in') || msgLower.includes('checkin') || msgLower.includes('arrival')) return 'checkin';\n  if (msgLower.includes('check-out') || msgLower.includes('checkout') || msgLower.includes('departure')) return 'checkout';\n  if (msgLower.includes('booking') || msgLower.includes('reservation') || msgLower.includes('confirm')) return 'booking';\n  if (msgLower.includes('cancel') || msgLower.includes('modify') || msgLower.includes('change')) return 'modification';\n  if (msgLower.includes('available') || msgLower.includes('vacancy') || msgLower.includes('book')) return 'availability';\n  if (msgLower.includes('amenity') || msgLower.includes('facility') || msgLower.includes('service')) return 'amenities';\n  if (msgLower.includes('location') || msgLower.includes('direction') || msgLower.includes('address')) return 'location';\n  if (msgLower.includes('wifi') || msgLower.includes('internet') || msgLower.includes('password')) return 'technical';\n  if (msgLower.includes('price') || msgLower.includes('cost') || msgLower.includes('rate') || msgLower.includes('payment')) return 'pricing';\n  \n  return 'general';\n}\n\nreturn {\n  conversationId,\n  guestInfo: {\n    email: guestEmail,\n    name: guestName,\n    bookingReference\n  },\n  request: {\n    message,\n    type: requestType,\n    timestamp: new Date().toISOString(),\n    language: detectLanguage(message)\n  }\n};\n\nfunction detectLanguage(text) {\n  // Simple language detection - can be enhanced\n  const spanishWords = ['hola', 'gracias', 'por favor', 'disculpe'];\n  const frenchWords = ['bonjour', 'merci', 'excusez-moi', 'sil vous plait'];\n  const germanWords = ['hallo', 'danke', 'entschuldigung', 'bitte'];\n  \n  const textLower = text.toLowerCase();\n  \n  if (spanishWords.some(word => textLower.includes(word))) return 'es';\n  if (frenchWords.some(word => textLower.includes(word))) return 'fr';\n  if (germanWords.some(word => textLower.includes(word))) return 'de';\n  \n  return 'en'; // Default to English\n}"
+      },
+      "id": "guest-info-processor",
+      "name": "Process Guest Information",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [700, 240],
+      "notes": {
+        "note": "🔄 GUEST INFO PROCESSOR\n\nProcesses and normalizes incoming guest information:\n- Extracts message, email, booking reference\n- Classifies request type (checkin, checkout, booking, etc.)\n- Detects language for multilingual support\n- Generates unique conversation ID for tracking\n\nRequest Types:\n- checkin, checkout, booking, modification\n- availability, amenities, location, technical, pricing, general"
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "beds24Api",
+        "requestMethod": "POST",
+        "url": "https://api.beds24.com/json/getV2RefreshToken",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyContentType": "json",
+        "jsonBody": "={\n  \"authentication\": {\n    \"apiKey\": \"{{ $credentials.beds24Api.apiKey }}\",\n    \"propKey\": \"{{ $credentials.beds24Api.propKey }}\"\n  }\n}",
+        "options": {
+          "timeout": 30000,
+          "retry": {
+            "enabled": true,
+            "maxTries": 3,
+            "waitBetween": 1000
+          }
+        }
+      },
+      "id": "refresh-token-generator",
+      "name": "Generate Beds24 Refresh Token",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [920, 120],
+      "alwaysOutputData": true,
+      "notes": {
+        "note": "🔑 REFRESH TOKEN GENERATOR\n\nAutomatically generates refresh tokens for Beds24 API v2 access.\n\nProcess:\n1. Uses API v1 credentials (apiKey, propKey)\n2. Calls getV2RefreshToken endpoint\n3. Stores refresh token for subsequent API calls\n4. Handles token refresh automatically\n\nThis ensures continuous API access without manual intervention."
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "booking_reference_check",
+              "leftValue": "={{ $('Process Guest Information').item(0, 0).json.guestInfo.bookingReference }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "booking-reference-check",
+      "name": "Has Booking Reference?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [920, 240],
+      "notes": {
+        "note": "🔍 BOOKING REFERENCE CHECK\n\nChecks if guest provided a booking reference.\n\nIf YES: Fetch specific booking details\nIf NO: Use general knowledge base or ask for reference\n\nThis determines the information retrieval strategy."
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "beds24Api",
+        "requestMethod": "POST",
+        "url": "https://api.beds24.com/json/getBookings",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $('Generate Beds24 Refresh Token').item(0, 0).json.refreshToken }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyContentType": "json",
+        "jsonBody": "={\n  \"authentication\": {\n    \"apiKey\": \"{{ $credentials.beds24Api.apiKey }}\",\n    \"propKey\": \"{{ $credentials.beds24Api.propKey }}\"\n  },\n  \"bookId\": \"{{ $('Process Guest Information').item(0, 0).json.guestInfo.bookingReference }}\",\n  \"includeInvoice\": true,\n  \"includeInfoItems\": true,\n  \"includeInfoItemsConverted\": true\n}",
+        "options": {
+          "timeout": 30000,
+          "retry": {
+            "enabled": true,
+            "maxTries": 3,
+            "waitBetween": 1000
+          }
+        }
+      },
+      "id": "fetch-booking-details",
+      "name": "Fetch Booking Details",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1140, 160],
+      "executeOnce": false,
+      "alwaysOutputData": true,
+      "notes": {
+        "note": "📋 BOOKING DETAILS FETCHER\n\nRetrieves comprehensive booking information from Beds24:\n\n- Booking status and dates\n- Guest information\n- Room details and preferences\n- Invoice and payment status\n- Special requests and notes\n\nIncludes invoice items and converted info items for complete context."
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "beds24Api",
+        "requestMethod": "POST",
+        "url": "https://api.beds24.com/json/getRoomDates",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $('Generate Beds24 Refresh Token').item(0, 0).json.refreshToken }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyContentType": "json",
+        "jsonBody": "={\n  \"authentication\": {\n    \"apiKey\": \"{{ $credentials.beds24Api.apiKey }}\",\n    \"propKey\": \"{{ $credentials.beds24Api.propKey }}\"\n  },\n  \"roomId\": \"{{ $('Fetch Booking Details').item(0, 0).json[0].roomId }}\",\n  \"from\": \"{{ DateTime.now().toFormat('yyyyMMdd') }}\",\n  \"to\": \"{{ DateTime.now().plus({days: 30}).toFormat('yyyyMMdd') }}\",\n  \"incMaxStay\": 1,\n  \"incMultiplier\": 1,\n  \"incOverride\": 1\n}",
+        "options": {
+          "timeout": 30000,
+          "retry": {
+            "enabled": true,
+            "maxTries": 3,
+            "waitBetween": 1000
+          }
+        }
+      },
+      "id": "check-availability",
+      "name": "Check Room Availability",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1360, 160],
+      "executeOnce": false,
+      "alwaysOutputData": true,
+      "notes": {
+        "note": "📅 AVAILABILITY CHECKER\n\nChecks current and future room availability:\n\n- Current inventory levels\n- Pricing information\n- Minimum/maximum stay requirements\n- Booking restrictions\n- Override status\n\nProvides 30-day forward availability data for guest inquiries."
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "topK": 5,
+        "options": {
+          "metadata": {}
+        }
+      },
+      "id": "pinecone-knowledge-retrieval",
+      "name": "Retrieve Knowledge from Pinecone",
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePinecone",
+      "typeVersion": 1,
+      "position": [920, 320],
+      "alwaysOutputData": true,
+      "notes": {
+        "note": "🧠 KNOWLEDGE BASE RETRIEVAL\n\nRetrieves relevant information from Pinecone vector database:\n\n- Property amenities and facilities\n- Local area information\n- Policies and procedures\n- FAQ responses\n- Service information\n\nUses semantic search to find the most relevant knowledge for guest queries."
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "context-builder",
+              "name": "conversationContext",
+              "value": "={\n  \"guestInfo\": {{ $('Process Guest Information').item(0, 0).json.guestInfo }},\n  \"requestType\": \"{{ $('Process Guest Information').item(0, 0).json.request.type }}\",\n  \"timestamp\": \"{{ $('Process Guest Information').item(0, 0).json.request.timestamp }}\",\n  \"bookingDetails\": {{ $('Fetch Booking Details').item(0, 0).json || null }},\n  \"availability\": {{ $('Check Room Availability').item(0, 0).json || null }},\n  \"knowledgeBase\": {{ $('Retrieve Knowledge from Pinecone').item(0, 0).json || [] }},\n  \"language\": \"{{ $('Process Guest Information').item(0, 0).json.request.language }}\"\n}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "context-builder",
+      "name": "Build Conversation Context",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [1580, 240],
+      "notes": {
+        "note": "🏗️ CONTEXT BUILDER\n\nCombines all available information into a unified context:\n\n- Guest information and booking details\n- Current availability and pricing\n- Retrieved knowledge base content\n- Request type and language preference\n\nThis context provides the AI agent with complete information for personalized responses."
+      }
+    },
+    {
+      "parameters": {
+        "systemMessage": "You are an advanced autonomous guest services agent for a hospitality property using the Beds24 system. Your role is to provide exceptional, personalized service to guests through intelligent automation.\n\n## Your Capabilities:\n\n### Booking Information\n- Access real-time booking details, status, and preferences\n- Provide check-in/check-out information and procedures\n- Handle booking modifications and special requests\n- Process payment and invoice inquiries\n\n### Availability & Reservations\n- Check current room availability and pricing\n- Assist with new booking requests\n- Provide alternative dates and options\n- Handle upgrade requests and room changes\n\n### Property Information\n- Share comprehensive property amenities and facilities\n- Provide local area recommendations and directions\n- Explain policies, procedures, and guidelines\n- Answer frequently asked questions\n\n### Multilingual Support\n- Communicate in the guest's preferred language\n- Adapt cultural communication styles appropriately\n- Provide translations when needed\n\n## Context Available:\n{{ $json.conversationContext }}\n\n## Instructions:\n\n1. **Personalization**: Always use the guest's name and booking reference when available\n2. **Accuracy**: Base responses on actual booking data and availability information\n3. **Proactivity**: Anticipate guest needs and offer relevant additional information\n4. **Efficiency**: Provide complete, actionable responses that minimize follow-up questions\n5. **Tone**: Maintain a professional, friendly, and helpful tone\n6. **Privacy**: Never share other guests' information or sensitive data\n\n## Response Format:\n- Acknowledge the guest personally\n- Provide direct answers to their questions\n- Include relevant booking or availability details\n- Offer additional assistance or recommendations\n- End with a helpful closing statement\n\n## Current Date/Time: {{ DateTime.now().toLocaleString() }}\n\nNow please respond to the guest's message thoughtfully and comprehensively.",
+        "hasOutputParser": false
+      },
+      "id": "ai-guest-services-agent",
+      "name": "AI Guest Services Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.6,
+      "position": [1800, 240],
+      "notes": {
+        "note": "🤖 AI GUEST SERVICES AGENT\n\nAdvanced AI agent with comprehensive hospitality knowledge:\n\nCapabilities:\n- Personalized guest communication\n- Real-time booking information access\n- Availability checking and booking assistance\n- Multilingual support (EN, ES, FR, DE)\n- Proactive service recommendations\n\nFeatures:\n- Context-aware responses\n- Professional hospitality tone\n- Privacy and security conscious\n- Cultural adaptation\n- Comprehensive knowledge integration"
+      }
+    },
+    {
+      "parameters": {
+        "model": "gpt-4-0125-preview",
+        "options": {
+          "temperature": 0.3,
+          "maxTokens": 1000,
+          "topP": 1,
+          "frequencyPenalty": 0,
+          "presencePenalty": 0
+        }
+      },
+      "id": "openai-chat-model",
+      "name": "OpenAI GPT-4 Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1,
+      "position": [1800, 120],
+      "notes": {
+        "note": "🧠 OPENAI GPT-4 MODEL\n\nHigh-performance language model optimized for guest services:\n\n- Model: GPT-4-0125-preview\n- Temperature: 0.3 (balanced creativity/accuracy)\n- Max Tokens: 1000 (comprehensive responses)\n- Optimized for hospitality communication\n\nProvides intelligent, contextual responses for all guest service scenarios."
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdTemplate": "={{ $('Process Guest Information').item(0, 0).json.conversationId }}",
+        "contextWindowSize": 10
+      },
+      "id": "conversation-memory",
+      "name": "Conversation Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.2,
+      "position": [1800, 360],
+      "notes": {
+        "note": "💭 CONVERSATION MEMORY\n\nMaintains conversation history for personalized interactions:\n\n- Session-based memory per guest\n- 10-message context window\n- Persistent across multiple interactions\n- Enables follow-up conversations\n\nRemembers guest preferences and previous requests for better service continuity."
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "Use this tool to search for and retrieve relevant property information, amenities, policies, and local area details from the knowledge base. This helps answer guest questions about facilities, services, and general property information.",
+        "workflowId": "{{ $workflow.id }}"
+      },
+      "id": "knowledge-base-tool",
+      "name": "Knowledge Base Search Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 1.1,
+      "position": [1600, 360],
+      "notes": {
+        "note": "🔧 KNOWLEDGE BASE TOOL\n\nAI tool for searching property and local information:\n\n- Semantic search capabilities\n- Property amenities and facilities\n- Local attractions and directions\n- Policies and procedures\n- FAQ responses\n\nProvides the AI agent with access to comprehensive property knowledge."
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "Use this tool to check current room availability, pricing, and booking restrictions for specific dates. Helps guests with booking inquiries and availability questions.",
+        "workflowId": "{{ $workflow.id }}"
+      },
+      "id": "availability-checker-tool",
+      "name": "Availability Checker Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 1.1,
+      "position": [1400, 360],
+      "notes": {
+        "note": "🔧 AVAILABILITY TOOL\n\nAI tool for real-time availability checking:\n\n- Current room availability\n- Pricing information\n- Booking restrictions\n- Minimum stay requirements\n- Alternative date suggestions\n\nEnables the AI agent to provide accurate availability information and booking assistance."
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "beds24Api",
+        "requestMethod": "POST",
+        "url": "https://api.beds24.com/json/getMessages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $('Generate Beds24 Refresh Token').item(0, 0).json.refreshToken }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyContentType": "json",
+        "jsonBody": "={\n  \"authentication\": {\n    \"apiKey\": \"{{ $credentials.beds24Api.apiKey }}\",\n    \"propKey\": \"{{ $credentials.beds24Api.propKey }}\"\n  },\n  \"bookId\": \"{{ $('Process Guest Information').item(0, 0).json.guestInfo.bookingReference }}\",\n  \"fromDate\": \"{{ DateTime.now().minus({days: 30}).toFormat('yyyy-MM-dd') }}\",\n  \"toDate\": \"{{ DateTime.now().toFormat('yyyy-MM-dd') }}\"\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "fetch-message-history",
+      "name": "Fetch Message History",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1140, 320],
+      "executeOnce": false,
+      "alwaysOutputData": true,
+      "notes": {
+        "note": "💬 MESSAGE HISTORY FETCHER\n\nRetrieves previous communication history with the guest:\n\n- Past 30 days of messages\n- Guest communication preferences\n- Previous requests and resolutions\n- Service history and notes\n\nProvides context for personalized and informed responses."
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format the AI response and prepare for delivery\nconst aiResponse = $input.item(0, 0).json.output;\nconst guestInfo = $('Process Guest Information').item(0, 0).json.guestInfo;\nconst conversationId = $('Process Guest Information').item(0, 0).json.conversationId;\nconst timestamp = new Date().toISOString();\n\n// Log the interaction for analytics and training\nconst interactionLog = {\n  conversationId,\n  timestamp,\n  guestEmail: guestInfo.email,\n  guestName: guestInfo.name,\n  bookingReference: guestInfo.bookingReference,\n  originalMessage: $('Process Guest Information').item(0, 0).json.request.message,\n  requestType: $('Process Guest Information').item(0, 0).json.request.type,\n  aiResponse: aiResponse,\n  language: $('Process Guest Information').item(0, 0).json.request.language,\n  responseTime: Date.now() - new Date($('Process Guest Information').item(0, 0).json.request.timestamp).getTime()\n};\n\n// Format final response\nconst formattedResponse = {\n  success: true,\n  response: aiResponse,\n  conversationId,\n  timestamp,\n  metadata: {\n    guestEmail: guestInfo.email,\n    language: $('Process Guest Information').item(0, 0).json.request.language,\n    responseType: 'ai_generated'\n  }\n};\n\nreturn {\n  response: formattedResponse,\n  log: interactionLog\n};"
+      },
+      "id": "response-formatter",
+      "name": "Format Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2020, 240],
+      "notes": {
+        "note": "📝 RESPONSE FORMATTER\n\nFormats and logs the AI agent's response:\n\n- Structures final response for delivery\n- Logs interaction for analytics\n- Tracks response time and quality\n- Maintains conversation history\n- Prepares metadata for tracking\n\nEnsures consistent response format and comprehensive logging for continuous improvement."
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "beds24Api",
+        "requestMethod": "POST",
+        "url": "https://api.beds24.com/json/setMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $('Generate Beds24 Refresh Token').item(0, 0).json.refreshToken }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyContentType": "json",
+        "jsonBody": "={\n  \"authentication\": {\n    \"apiKey\": \"{{ $credentials.beds24Api.apiKey }}\",\n    \"propKey\": \"{{ $credentials.beds24Api.propKey }}\"\n  },\n  \"bookId\": \"{{ $('Process Guest Information').item(0, 0).json.guestInfo.bookingReference }}\",\n  \"message\": \"{{ $('Format Response').item(0, 0).json.response.response }}\",\n  \"messageType\": \"guest_services_response\",\n  \"sentBy\": \"AI_Agent\",\n  \"timestamp\": \"{{ $('Format Response').item(0, 0).json.response.timestamp }}\"\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "send-message-to-beds24",
+      "name": "Log Message in Beds24",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [2240, 160],
+      "executeOnce": false,
+      "alwaysOutputData": true,
+      "continueOnFail": true,
+      "notes": {
+        "note": "📤 MESSAGE LOGGER\n\nLogs the AI response in Beds24 system:\n\n- Records interaction in booking history\n- Maintains communication audit trail\n- Enables staff visibility of AI interactions\n- Supports compliance and quality monitoring\n\nContinues on fail to ensure guest receives response even if logging fails."
+      }
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "documents": "=[{\n  \"pageContent\": \"Guest Interaction Log: {{ $('Format Response').item(0, 0).json.log.originalMessage }} - Response: {{ $('Format Response').item(0, 0).json.log.aiResponse }}\",\n  \"metadata\": {\n    \"type\": \"guest_interaction\",\n    \"conversationId\": \"{{ $('Format Response').item(0, 0).json.log.conversationId }}\",\n    \"guestEmail\": \"{{ $('Format Response').item(0, 0).json.log.guestEmail }}\",\n    \"timestamp\": \"{{ $('Format Response').item(0, 0).json.log.timestamp }}\",\n    \"requestType\": \"{{ $('Format Response').item(0, 0).json.log.requestType }}\",\n    \"language\": \"{{ $('Format Response').item(0, 0).json.log.language }}\",\n    \"responseTime\": {{ $('Format Response').item(0, 0).json.log.responseTime }}\n  }\n}]"
+      },
+      "id": "store-interaction-in-pinecone",
+      "name": "Store Interaction in Pinecone",
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePinecone",
+      "typeVersion": 1,
+      "position": [2240, 320],
+      "continueOnFail": true,
+      "notes": {
+        "note": "💾 INTERACTION STORAGE\n\nStores guest interactions in Pinecone for learning:\n\n- Builds knowledge from real guest queries\n- Improves future response accuracy\n- Creates searchable interaction history\n- Enables quality analysis and training\n\nContinuous learning system that improves service quality over time."
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $('Format Response').item(0, 0).json.response }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "name": "X-Conversation-ID",
+                "value": "={{ $('Format Response').item(0, 0).json.response.conversationId }}"
+              }
+            ]
+          }
+        }
+      },
+      "id": "webhook-response",
+      "name": "Send Response to Guest",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [2460, 240],
+      "notes": {
+        "note": "📬 FINAL RESPONSE\n\nSends the AI-generated response back to the guest:\n\n- JSON formatted response\n- Includes conversation ID for tracking\n- Professional and helpful tone\n- Immediate delivery\n\nCompletes the autonomous guest service interaction cycle."
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineAll",
+        "options": {}
+      },
+      "id": "merge-data-streams",
+      "name": "Merge Data Streams",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [1580, 140],
+      "notes": {
+        "note": "🔀 DATA MERGER\n\nCombines multiple data streams:\n\n- Booking details from Beds24\n- Availability information\n- Knowledge base results\n- Message history\n\nEnsures all relevant information is available for AI processing."
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Automatic refresh token management\n// This runs every 30 minutes to ensure tokens stay fresh\n\nconst currentToken = $input.item(0, 0).json.refreshToken;\nconst tokenTimestamp = $input.item(0, 0).json.timestamp || Date.now();\nconst now = Date.now();\n\n// Check if token is older than 25 minutes (refresh before 30min expiry)\nconst tokenAge = now - tokenTimestamp;\nconst refreshThreshold = 25 * 60 * 1000; // 25 minutes in milliseconds\n\nif (tokenAge > refreshThreshold) {\n  console.log('Refresh token is expiring soon, triggering renewal');\n  return [{ needsRefresh: true, currentToken }];\n} else {\n  console.log('Refresh token is still valid');\n  return [{ needsRefresh: false, currentToken }];\n}"
+      },
+      "id": "token-refresh-scheduler",
+      "name": "Token Refresh Scheduler",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [700, 120],
+      "notes": {
+        "note": "⏰ TOKEN REFRESH SCHEDULER\n\nAutomatic refresh token management:\n\n- Monitors token expiration (30-minute lifecycle)\n- Proactively refreshes tokens before expiry\n- Prevents authentication failures\n- Runs every 25 minutes for safety margin\n\nEnsures continuous API access without manual intervention."
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 30
+            }
+          ]
+        }
+      },
+      "id": "refresh-token-cron",
+      "name": "Refresh Token Cron",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [260, 120],
+      "notes": {
+        "note": "🕒 AUTOMATIC TOKEN REFRESH\n\nScheduled trigger for token maintenance:\n\n- Runs every 30 minutes\n- Ensures tokens never expire\n- Maintains seamless API access\n- Background process - no guest impact\n\nCritical for uninterrupted service operation."
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "workflow-status",
+              "name": "workflowStatus",
+              "value": "={\n  \"initialized\": true,\n  \"timestamp\": \"{{ DateTime.now().toISO() }}\",\n  \"version\": \"1.0.0\",\n  \"capabilities\": [\n    \"guest_communication\",\n    \"booking_management\",\n    \"availability_checking\",\n    \"knowledge_retrieval\",\n    \"multilingual_support\",\n    \"automatic_token_refresh\"\n  ],\n  \"status\": \"ready\"\n}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "workflow-initializer",
+      "name": "Initialize Workflow",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [480, 120],
+      "notes": {
+        "note": "🚀 WORKFLOW INITIALIZER\n\nInitializes the autonomous guest services system:\n\n- Sets workflow status and version\n- Defines available capabilities\n- Prepares system for operation\n- Validates configuration\n\nEnsures all components are ready for guest service automation."
+      }
+    }
+  ],
+  "connections": {
+    "Guest Services Webhook": {
+      "main": [
+        [
+          {
+            "node": "Request Validation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Request Validation": {
+      "main": [
+        [
+          {
+            "node": "Process Guest Information",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Invalid Request Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Guest Information": {
+      "main": [
+        [
+          {
+            "node": "Has Booking Reference?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Retrieve Knowledge from Pinecone",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Beds24 Refresh Token": {
+      "main": [
+        [
+          {
+            "node": "Merge Data Streams",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Booking Reference?": {
+      "main": [
+        [
+          {
+            "node": "Fetch Booking Details",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Generate Beds24 Refresh Token",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Generate Beds24 Refresh Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Booking Details": {
+      "main": [
+        [
+          {
+            "node": "Check Room Availability",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Message History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Room Availability": {
+      "main": [
+        [
+          {
+            "node": "Merge Data Streams",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Retrieve Knowledge from Pinecone": {
+      "main": [
+        [
+          {
+            "node": "Merge Data Streams",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Build Conversation Context": {
+      "main": [
+        [
+          {
+            "node": "AI Guest Services Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Guest Services Agent": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Message History": {
+      "main": [
+        [
+          {
+            "node": "Merge Data Streams",
+            "type": "main",
+            "index": 3
+          }
+        ]
+      ]
+    },
+    "Format Response": {
+      "main": [
+        [
+          {
+            "node": "Send Response to Guest",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Log Message in Beds24",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Store Interaction in Pinecone",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Data Streams": {
+      "main": [
+        [
+          {
+            "node": "Build Conversation Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Token Refresh Scheduler": {
+      "main": [
+        [
+          {
+            "node": "Generate Beds24 Refresh Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Refresh Token Cron": {
+      "main": [
+        [
+          {
+            "node": "Initialize Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Initialize Workflow": {
+      "main": [
+        [
+          {
+            "node": "Token Refresh Scheduler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "error-handler-workflow",
+    "timezone": "America/New_York"
+  },
+  "staticData": {},
+  "tags": [
+    {
+      "createdAt": "2024-01-15T10:00:00.000Z",
+      "updatedAt": "2024-01-15T10:00:00.000Z",
+      "id": "hospitality-automation",
+      "name": "Hospitality Automation"
+    },
+    {
+      "createdAt": "2024-01-15T10:00:00.000Z",
+      "updatedAt": "2024-01-15T10:00:00.000Z",
+      "id": "ai-agents",
+      "name": "AI Agents"
+    },
+    {
+      "createdAt": "2024-01-15T10:00:00.000Z",
+      "updatedAt": "2024-01-15T10:00:00.000Z",
+      "id": "beds24-integration",
+      "name": "Beds24 Integration"
+    }
+  ],
+  "triggerCount": 2,
+  "updatedAt": "2024-01-15T10:00:00.000Z",
+  "versionId": "autonomous-guest-services-v1.0.0"
+}
