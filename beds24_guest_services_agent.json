@@ -288,7 +288,7 @@
     },
     {
       "parameters": {
-        "model": "gpt-4-0125-preview",
+        "model": "deepseek-chat",
         "options": {
           "temperature": 0.3,
           "maxTokens": 1000,
@@ -297,13 +297,13 @@
           "presencePenalty": 0
         }
       },
-      "id": "openai-chat-model",
-      "name": "OpenAI GPT-4 Chat Model",
-      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "id": "deepseek-chat-model",
+      "name": "DeepSeek Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatDeepSeek",
       "typeVersion": 1,
       "position": [1800, 120],
       "notes": {
-        "note": "🧠 OPENAI GPT-4 MODEL\n\nHigh-performance language model optimized for guest services:\n\n- Model: GPT-4-0125-preview\n- Temperature: 0.3 (balanced creativity/accuracy)\n- Max Tokens: 1000 (comprehensive responses)\n- Optimized for hospitality communication\n\nProvides intelligent, contextual responses for all guest service scenarios."
+        "note": "🧠 DEEPSEEK CHAT MODEL\n\nCost-effective high-performance language model optimized for guest services:\n\n- Model: deepseek-chat\n- Temperature: 0.3 (balanced creativity/accuracy)\n- Max Tokens: 1000 (comprehensive responses)\n- Optimized for hospitality communication\n- 90% cost savings compared to GPT-4\n\nProvides intelligent, contextual responses for all guest service scenarios at a fraction of the cost."
       }
     },
     {

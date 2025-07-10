@@ -14,7 +14,7 @@ This comprehensive n8n workflow creates a fully autonomous guest services agent 
 - **Automatic refresh token management** for uninterrupted service
 
 ### 🧠 AI-Powered Intelligence
-- **GPT-4 powered responses** with hospitality-optimized prompts
+- **DeepSeek AI powered responses** with hospitality-optimized prompts (90% cost savings)
 - **RAG (Retrieval Augmented Generation)** using Pinecone vector database
 - **Conversation memory** to maintain context across interactions
 - **Request classification** for optimized response routing
@@ -33,7 +33,7 @@ Before setting up the workflow, ensure you have:
 
 1. **n8n Instance** (Cloud or Self-hosted)
 2. **Beds24 Account** with API access enabled
-3. **OpenAI API Account** with sufficient credits
+3. **DeepSeek API Account** with sufficient credits (90% cheaper than OpenAI)
 4. **Pinecone Account** for vector database
 5. **Basic understanding** of n8n workflows
 
@@ -76,17 +76,22 @@ Before setting up the workflow, ensure you have:
 - Enable **API access**
 - Copy your **API Key** and **Property Key**
 
-#### 🤖 OpenAI API Credentials
+#### 🤖 DeepSeek API Credentials
 
 1. **In n8n Credentials**, click **"Add Credential"**
-2. **Select "OpenAI"**
-3. **Enter your OpenAI API Key**
+2. **Select "DeepSeek"**
+3. **Enter your DeepSeek API Key**
 
-**To get your OpenAI API key:**
-- Visit [OpenAI Platform](https://platform.openai.com)
+**To get your DeepSeek API key:**
+- Visit [DeepSeek Platform](https://platform.deepseek.com)
 - Navigate to **API Keys**
 - Click **"Create new secret key"**
 - Copy and save the key securely
+
+**Cost Benefits:**
+- **90% cost savings** compared to OpenAI GPT-4
+- **Competitive performance** for hospitality use cases
+- **Same API compatibility** as OpenAI models
 
 #### 🧠 Pinecone Credentials
 
@@ -119,7 +124,7 @@ Go through each node that requires credentials and ensure they're properly conne
 3. **Check Room Availability** → Select `beds24Api`
 4. **Fetch Message History** → Select `beds24Api`
 5. **Log Message in Beds24** → Select `beds24Api`
-6. **OpenAI GPT-4 Chat Model** → Select your OpenAI credential
+6. **DeepSeek Chat Model** → Select your DeepSeek credential
 7. **Retrieve Knowledge from Pinecone** → Select your Pinecone credential
 8. **Store Interaction in Pinecone** → Select your Pinecone credential
 
@@ -268,12 +273,13 @@ const knowledgeItems = [
   - Multi-tool integration for data access
   - Professional tone with cultural adaptation
 
-#### 🧠 **OpenAI GPT-4 Chat Model**
+#### 🧠 **DeepSeek Chat Model**
 - **Configuration**:
-  - **Model**: gpt-4-0125-preview
+  - **Model**: deepseek-chat
   - **Temperature**: 0.3 (balanced creativity/accuracy)
   - **Max Tokens**: 1000 (comprehensive responses)
   - **Optimization**: Hospitality communication
+  - **Cost Savings**: 90% reduction compared to GPT-4
 
 #### 💭 **Conversation Memory**
 - **Purpose**: Maintains conversation context across interactions
@@ -518,12 +524,12 @@ function handleErrors(error, guestInfo) {
 - Ensure index dimensions match (1536 for OpenAI)
 - Monitor Pinecone usage limits
 
-#### 3. **OpenAI Rate Limits**
+#### 3. **DeepSeek Rate Limits**
 
 **Problem**: "Rate limit exceeded" errors
 
 **Solutions**:
-- Upgrade OpenAI plan for higher limits
+- Upgrade DeepSeek plan for higher limits (much more affordable than OpenAI)
 - Implement request queuing in high-volume scenarios
 - Add retry logic with exponential backoff
 - Monitor token usage and optimize prompts
@@ -595,7 +601,7 @@ const optimizedQuery = preprocessQuery(userMessage, {
 2. **Resolution Rate**: Percentage of queries resolved without escalation
 3. **Guest Satisfaction**: Based on follow-up interactions
 4. **API Performance**: Beds24 API response times and error rates
-5. **Token Usage**: OpenAI token consumption and costs
+5. **Token Usage**: DeepSeek token consumption and costs (90% savings)
 6. **Conversation Length**: Average number of exchanges per session
 
 ### Setting Up Monitoring Dashboard
@@ -847,12 +853,12 @@ const loadBalancer = {
 
 - **n8n Community**: [https://community.n8n.io](https://community.n8n.io)
 - **Beds24 Support**: Available through their support portal
-- **OpenAI Documentation**: [https://platform.openai.com/docs](https://platform.openai.com/docs)
+- **DeepSeek Documentation**: [https://platform.deepseek.com/docs](https://platform.deepseek.com/docs)
 - **Pinecone Support**: [https://docs.pinecone.io](https://docs.pinecone.io)
 
 ## 🎉 Conclusion
 
-This autonomous guest services agent represents a cutting-edge solution for hospitality automation. By combining the power of Beds24's comprehensive booking management, OpenAI's advanced language capabilities, and Pinecone's intelligent knowledge retrieval, you've created a system that can:
+This autonomous guest services agent represents a cutting-edge solution for hospitality automation. By combining the power of Beds24's comprehensive booking management, DeepSeek's advanced language capabilities at 90% cost savings, and Pinecone's intelligent knowledge retrieval, you've created a system that can:
 
 - **Provide 24/7 guest support** without human intervention
 - **Access real-time booking information** and availability
